@@ -1,0 +1,19 @@
+{
+  "name": "@ice-time/scraper",
+  "private": true,
+  "description": "The web scraper for ice-time, this will gather data for us",
+  "scripts": {
+    "scrape": "TZ=America/Denver tsx src/cli.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "author": "Val Kozarev",
+  "license": "GPL-3.0-only",
+  "type": "module",
+  "dependencies": {
+    "@ice-time/shared": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^24.19.2",
+    "tsx": "^4.23.15"
+  }
+}
