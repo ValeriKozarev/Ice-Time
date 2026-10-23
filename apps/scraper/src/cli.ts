@@ -1,1 +1,1 @@
-console.log('scraper is running, TZ = ', process.env.TZ);
+console.log("scraper is running, TZ = ", process.env.TZ);

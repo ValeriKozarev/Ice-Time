@@ -1,18 +1,18 @@
 {
-    "compilerOptions": {
-        "target": "es2023",
-        "lib": ["es2023"],
-        "module": "esnext",
-        "moduleResolution": "bundler",
-        "noEmit": true,
-        "strict": true,
-        "noUncheckedIndexedAccess": true,
-        "verbatimModuleSyntax": true,
-        "skipLibCheck": true,
-        "noUnusedLocals": true,
-        "noUnusedParameters": true,
-        "noFallthroughCasesInSwitch": true,
-        "erasableSyntaxOnly": true,
-        "moduleDetection": "force"
-    }
+  "compilerOptions": {
+    "target": "es2023",
+    "lib": ["es2023"],
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "noEmit": true,
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "verbatimModuleSyntax": true,
+    "skipLibCheck": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "erasableSyntaxOnly": true,
+    "moduleDetection": "force"
+  }
 }
