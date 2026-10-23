@@ -1,3 +1,9 @@
+# instruction set for parsing the raw request data
+CLAUDE.md
+
+# raw request data, not needed once we got our data shape so don't commit
+research/*
+
 # Logs
 logs
 *.log
