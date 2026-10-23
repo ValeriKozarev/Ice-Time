@@ -10,11 +10,11 @@ A scraper runs once a week, normalizes each rink's schedule into a shared `Sessi
 
 TypeScript everywhere, in a pnpm workspace:
 
-| Package | What it is |
-| --- | --- |
-| `apps/scraper` | Node CLI that fetches rink schedules and writes `sessions.json` (run with tsx) |
-| `apps/web` | React + Vite page that displays the week |
-| `packages/shared` | The `Session` zod schema and types, used by both apps |
+| Package           | What it is                                                                     |
+| ----------------- | ------------------------------------------------------------------------------ |
+| `apps/scraper`    | Node CLI that fetches rink schedules and writes `sessions.json` (run with tsx) |
+| `apps/web`        | React + Vite page that displays the week                                       |
+| `packages/shared` | The `Session` zod schema and types, used by both apps                          |
 
 Tooling: TypeScript 7, Vitest, Oxlint, Prettier.
 
@@ -26,14 +26,14 @@ Requires Node 24 (see `.nvmrc`) and pnpm.
 pnpm install
 ```
 
-| Command | Does |
-| --- | --- |
-| `pnpm test` | Run all tests (watch mode locally) |
-| `pnpm typecheck` | Type-check every package |
-| `pnpm lint` | Lint with Oxlint |
-| `pnpm format` | Format with Prettier |
-| `pnpm --filter @ice-time/web dev` | Start the web app locally |
-| `pnpm --filter @ice-time/scraper scrape` | Run the scraper |
+| Command                                  | Does                               |
+| ---------------------------------------- | ---------------------------------- |
+| `pnpm test`                              | Run all tests (watch mode locally) |
+| `pnpm typecheck`                         | Type-check every package           |
+| `pnpm lint`                              | Lint with Oxlint                   |
+| `pnpm format`                            | Format with Prettier               |
+| `pnpm --filter @ice-time/web dev`        | Start the web app locally          |
+| `pnpm --filter @ice-time/scraper scrape` | Run the scraper                    |
 
 ## Scraping etiquette
 
