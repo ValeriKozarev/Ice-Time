@@ -1,8 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { parseBigBear } from "./big-bear";
-
-import type { Session } from "@ice-time/shared";
+import { Session } from "@ice-time/shared";
 
 const fixture = JSON.parse(
   readFileSync(
@@ -12,6 +11,15 @@ const fixture = JSON.parse(
 );
 
 describe("Big Bear Adapter", () => {
+  it("Every output passes Session.safeParse", () => {
+    // doing it this way will help us track down problems faster
+    const failures = parseBigBear(fixture)
+      .map((s) => ({ id: s.id, result: Session.safeParse(s) }))
+      .filter((r) => !r.result.success);
+
+    expect(failures).toEqual([]);
+  })
+
   it("Correctly keeps only Public Skate and Stick and Puck activities from the data response (57 of 86)", () => {
     expect(parseBigBear(fixture)).toHaveLength(57);
   });

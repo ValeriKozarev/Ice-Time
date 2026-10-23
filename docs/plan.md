@@ -54,7 +54,7 @@ The scraper output is a `ScrapeResult` envelope: `scrapedAt`, a `rinks` record w
 |                       | Big Bear (EZFacility)             | DU (WebTrac)                                                                               | Edge (CapturePoint)                                                 | SSPRD x2 (Finnly)                                                        |
 | --------------------- | --------------------------------- | ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------- | ------------------------------------------------------------------------ |
 | Format                | JSON from the `FilterResults` XHR | HTML month calendar per section                                                            | HTML program detail page                                            | HTML with a JSON-parseable `_onlineScheduleList = [...]` in a script tag |
-| Requests per run      | 1 (if one range covers the week)  | 1 per section per month (4 stick and puck sections in the sample)                          | 1 per program per season                                            | 1 per rink; the sample covers ~8 months                                  |
+| Requests per run      | 1 form POST per week, no cookies  | 1 per section per month (4 stick and puck sections in the sample)                          | 1 per program per season                                            | 1 per rink; the sample covers ~8 months                                  |
 | One session =         | array item                        | `a.calendar__block`                                                                        | `table.cat-table-schedule tbody tr`                                 | array item                                                               |
 | `startTime`/`endTime` | `start`, `end`                    | href `ARItemBeginDate` (MM/DD/YYYY) + `ARItemBeginTime`/`EndTime` (seconds since midnight) | cells `class-date` + `class-start-time`/`class-end-time` (12:00 PM) | `EventStartTime`, `EventEndTime`                                         |
 | Activity label        | `title`                           | link text, or known from the primarycode fetched                                           | known from the program fetched                                      | `EventTypeName`                                                          |
@@ -74,18 +74,20 @@ Match exact labels per adapter (a regex like `/skate/i` would catch Learn To Ska
 
 ## Decisions
 
-| Decision           | Choice                                                                  | Why                                                                                                                                                            |
-| ------------------ | ----------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Language           | TypeScript everywhere (Node scraper, React front end)                   | One language and shared types end to end; Playwright is Node-native; .NET felt too heavy for this size of project                                              |
-| Architecture       | Option C: static pipeline, containerized from day one                   | A scheduled scraper writes `sessions.json`, a static React page reads it; free to host, and it can grow into a K8s CronJob without a rewrite                   |
-| Hosting            | GitHub Actions on a weekly schedule, page on GitHub Pages               | No server to run or pay for                                                                                                                                    |
-| K8s practice       | Scraper as a CronJob on a local kind or k3d cluster                     | Real Kubernetes experience without a cloud bill                                                                                                                |
-| Data model         | One shared `Session` zod schema and type                                | TS types vanish at runtime, so scraped data is validated at the boundary                                                                                       |
-| Monorepo tooling   | pnpm workspaces, no Turborepo; shared package is source-only            | Small repo; no build step for `packages/shared`                                                                                                                |
-| Time values        | Session times as local wall-clock strings; `scrapedAt` as a UTC instant | Rink times mean "local time" by definition; `Date` would shift them on a UTC runner. Date math via `Temporal.PlainDateTime` (polyfill, since Node 24 lacks it) |
-| Schema strictness  | `z.strictObject` everywhere                                             | We produce this data ourselves, so an unexpected key is a bug to surface, not ignore                                                                           |
-| Adapters           | One per platform behind a common interface                              | Five rinks share four platforms; adding a rink should be config, not code                                                                                      |
-| Scraping etiquette | Rare requests (weekly) with a clear User-Agent                          | robots.txt isn't binding, but we want to be friendly to these sites and never cause them trouble                                                               |
+| Decision           | Choice                                                                                                                          | Why                                                                                                                                                            |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Language           | TypeScript everywhere (Node scraper, React front end)                                                                           | One language and shared types end to end; Playwright is Node-native; .NET felt too heavy for this size of project                                              |
+| Architecture       | Option C: static pipeline, containerized from day one                                                                           | A scheduled scraper writes `sessions.json`, a static React page reads it; free to host, and it can grow into a K8s CronJob without a rewrite                   |
+| Hosting            | GitHub Actions on a weekly schedule, page on GitHub Pages                                                                       | No server to run or pay for                                                                                                                                    |
+| K8s practice       | Scraper as a CronJob on a local kind or k3d cluster                                                                             | Real Kubernetes experience without a cloud bill                                                                                                                |
+| Data model         | One shared `Session` zod schema and type                                                                                        | TS types vanish at runtime, so scraped data is validated at the boundary                                                                                       |
+| Monorepo tooling   | pnpm workspaces, no Turborepo; shared package is source-only                                                                    | Small repo; no build step for `packages/shared`                                                                                                                |
+| Time values        | Session times as local wall-clock strings; `scrapedAt` as a UTC instant                                                         | Rink times mean "local time" by definition; `Date` would shift them on a UTC runner. Date math via `Temporal.PlainDateTime` (polyfill, since Node 24 lacks it) |
+| Schema strictness  | `z.strictObject` everywhere                                                                                                     | We produce this data ourselves, so an unexpected key is a bug to surface, not ignore                                                                           |
+| Adapters           | One per platform behind a common interface                                                                                      | Five rinks share four platforms; adding a rink should be config, not code                                                                                      |
+| Scrape timing      | Sunday evening (Denver), for the upcoming Mon to Sun                                                                            | Big Bear only returns sessions that haven't started yet, so a Monday run could miss Monday's early sessions                                                    |
+| Session validation | Per row, in the CLI: `Session.safeParse` each adapter output, skip and log bad rows, then `ScrapeResult.parse` the whole result | Adapters stay pure mappings; one bad row never hides a rink's whole week                                                                                       |
+| Scraping etiquette | Rare requests (weekly) with a clear User-Agent                                                                                  | robots.txt isn't binding, but we want to be friendly to these sites and never cause them trouble                                                               |
 
 Options considered and set aside: Python (no edge over TS here, and off Val's interview stack), a .NET scraper, and a full API plus Postgres on a cloud cluster (cost and upkeep for one user).
 
@@ -97,7 +99,7 @@ Four steps, each ending in a PR Val writes and Claude reviews.
 2. [ ] **Skeleton and first adapter.** Monorepo with `scraper`, `web`, and a shared package holding the `Session` schema. Big Bear adapter with Vitest tests against saved responses, and a CLI that writes `sessions.json`.
    - [x] Monorepo scaffold (PR #1)
    - [x] Shared schema: `Session`, `RinkStatus`, `ScrapeResult` with tests (PR #2)
-   - [ ] Big Bear adapter and CLI (see Next up)
+   - [ ] Big Bear adapter and CLI (see Next up). In progress on branch `big-bear-adapter`: `parseBigBear` and its fixture tests are done
 3. [ ] **Remaining adapters and the week view.** Three more adapters, activity-name normalization, a React/Vite week grid filterable by rink and activity, and a weekly GitHub Actions job that scrapes and deploys to Pages.
 4. [ ] **Containers, K8s and email.** Dockerfile, manifests or a Helm chart running the scraper as a CronJob on kind, and a weekly email digest.
 
@@ -107,11 +109,11 @@ Stretch: filter sessions against Val's own schedule.
 
 The Big Bear adapter and the CLI, in small PRs:
 
-1. **Capture Big Bear's `FilterResults` request** in DevTools (URL, method, body) and save one week's response as a committed fixture, e.g. `apps/scraper/test/fixtures/bigbear.json`. `research/` is gitignored, so tests can't read from it.
-2. **Design the adapter interface** (discussion first). Likely split `fetch` (network) from `parse` (raw response to `Session[]`), so parsing is a pure function tested against the fixture with no network.
-3. **Big Bear `parse` + tests:** field mapping, trimming `.0000000`, exact-label activity mapping, dropping everything else, logging unknown labels, and building the `ezfacility:` id.
-4. **Big Bear `fetch`:** built-in `fetch`, a clear User-Agent, and the date range for the current week.
-5. **CLI:** run adapters, catch per-rink failures into `RinkStatus`, build a `ScrapeResult`, validate it, write `sessions.json`. Runs with `TZ=America/Denver`.
+1. [x] **Capture Big Bear's `FilterResults` request** and save a fixture. Request recon is in `research/bigbear.md`; fixture at `apps/scraper/test/fixtures/bigbear-2026-10-23.json`.
+2. [x] **Adapter shape:** split `fetch` (network) from `parse` (pure, tested against the fixture). The shared adapter interface is deferred until a second adapter exists, so it's designed from two real examples rather than one.
+3. [x] **Big Bear `parse` + tests:** raw-response schema (plain `z.object`, only the fields used), exact-label activity map, `flatMap` to drop other activities, `.slice(0, 19)` for times, `ezfacility:` id, surface and capacity. Tests: 57 of 86 kept, one item mapped exactly, every output passes `Session.safeParse`. Still to do: log labels we haven't seen.
+4. [ ] **Big Bear `fetch`:** built-in `fetch`, a clear User-Agent, the minimal form body from `research/bigbear.md` built with `URLSearchParams`, and the upcoming Mon to Sun dates. Check `content-type` is JSON, since failures arrive as a redirect to an HTML error page.
+5. [ ] **CLI:** compute next Mon to Sun in Denver time, run adapters, catch per-rink failures into `RinkStatus`, `Session.safeParse` each row (skip and log bad ones), build and `ScrapeResult.parse` the result, write `apps/web/public/sessions.json` (gitignored). Runs with `TZ=America/Denver`.
 
 ## How we work together
 
@@ -138,13 +140,14 @@ Val writes the code; Claude mentors and reviews. The aim is that Val can explain
 - [x] Monorepo tooling: pnpm workspaces, npm workspaces, or Turborepo? **Answer:** pnpm workspaces (PR #1).
 - [ ] Weekly email provider, decided at step 4
 - [ ] Redact the live cookie values in the pasted curl in `research/du.md` before committing
-- [ ] Big Bear: capture the `FilterResults` request (URL, method, body); can one call cover a full week?
+- [x] Big Bear: capture the `FilterResults` request (URL, method, body); can one call cover a full week? **Answer:** form POST, no cookies, one call per week, future sessions only; see `research/bigbear.md`.
 - [ ] Edge: sample the Stick & Puck group (6487); are the time-specific Public Skate programs duplicates of the "Various Times" one?
 - [ ] DU: does one calendar request without `CalendarFMID` show all sections?
 - [ ] Finnly: what sets the window start (Oct 15 in the sample)?
 - [ ] Include Silver Skates, Public Skate/Learn to Skate, and Family Stick & Puck?
 - [ ] `research/` sits at the repo root, but this file and CLAUDE.md say `docs/research` (and link `research.md`); move the folder or fix the references
 - [x] When do we add filtering against Val's own schedule? **Answer:** stretch goal toward the end.
+- [ ] Report skipped rows? Maybe `{ status: "ok", skipped: n }` in `RinkStatus` once a real scrape actually skips something.
 - [ ] Tighten `id` validation (non-empty, `<platform>:` prefix)? Decide in the Big Bear adapter PR.
 - [ ] Which `Temporal` polyfill for the week view? Node 24 has no global `Temporal`.
 - [ ] Are Finnly `EventId`s unique across both SSPRD rinks? Check against the two samples when writing the Finnly adapter.
