@@ -1,6 +1,6 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import { readFileSync } from "node:fs";
-import { parseBigBear } from "./big-bear";
+import { fetchBigBear, parseBigBear } from "./big-bear";
 import { Session } from "@ice-time/shared";
 
 const fixture = JSON.parse(
@@ -10,7 +10,17 @@ const fixture = JSON.parse(
   ),
 );
 
-describe("Big Bear Adapter", () => {
+afterEach(() => {
+  vi.unstubAllGlobals(); // put the real fetch back after every test
+});
+
+function stubFetch(response: Response) {
+  const fake = vi.fn().mockResolvedValue(response);
+  vi.stubGlobal("fetch", fake);
+  return fake;
+}
+
+describe("Big Bear Adapter (parse)", () => {
   it("Every output passes Session.safeParse", () => {
     // doing it this way will help us track down problems faster
     const failures = parseBigBear(fixture)
@@ -18,7 +28,7 @@ describe("Big Bear Adapter", () => {
       .filter((r) => !r.result.success);
 
     expect(failures).toEqual([]);
-  })
+  });
 
   it("Correctly keeps only Public Skate and Stick and Puck activities from the data response (57 of 86)", () => {
     expect(parseBigBear(fixture)).toHaveLength(57);
@@ -40,5 +50,30 @@ describe("Big Bear Adapter", () => {
     expect(
       parseBigBear(fixture).find((s) => s.id === "ezfacility:217287181"),
     ).toEqual(expectedSession);
+  });
+});
+
+describe("Big Bear Adapter (fetch)", () => {
+  it("sends a POST with all seven days and the week's dates", async () => {
+    const fake = stubFetch(
+      new Response("[]", { headers: { "content-type": "application/json" } }),
+    );
+    await fetchBigBear("2026-10-26", "2026-11-01");
+
+    const [, init] = fake.mock.calls[0]!;
+    expect(init.method).toBe("POST");
+    expect(init.body.get("Monday")).toBe("true");
+    expect(init.body.get("EndDate")).toBe("2026-11-01");
+  });
+
+  it("we throw on a bad result (like when we get blocked)", async () => {
+    stubFetch(
+      new Response("<html>Object moved</html>", {
+        headers: { "content-type": "text/html" },
+      }),
+    );
+    await expect(fetchBigBear("2026-10-26", "2026-11-01")).rejects.toThrow(
+      "not JSON",
+    );
   });
 });
