@@ -10,7 +10,8 @@
   "license": "GPL-3.0-only",
   "type": "module",
   "dependencies": {
-    "@ice-time/shared": "workspace:*"
+    "@ice-time/shared": "workspace:*",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@types/node": "^24.19.2",
