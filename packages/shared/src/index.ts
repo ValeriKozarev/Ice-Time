@@ -1,1 +1,1 @@
-export { Activity, Rink } from "./session";
+export { Activity, Rink, LocalDateTime } from "./session";
