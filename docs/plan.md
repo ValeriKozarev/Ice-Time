@@ -23,21 +23,29 @@ Five rinks sit on four booking platforms, so the scraper needs four adapters, no
 
 ## Session schema and field mappings
 
-Worked out from the samples in `research/` on 2026-10-23 (full analysis in [research/schema-field-mapping.md](../research/schema-field-mapping.md), kept local and uncommitted). This is the starting point for the `Session` zod schema; the schema itself is still Val's to write.
+Worked out from the samples in `research/` on 2026-10-23 (full analysis in [research/schema-field-mapping.md](../research/schema-field-mapping.md), kept local and uncommitted). The schema is implemented in [`packages/shared/src/session.ts`](../packages/shared/src/session.ts) (PR #2).
 
-| Field                  | Required     | Why                                                | Notes                                                    |
-| ---------------------- | ------------ | -------------------------------------------------- | -------------------------------------------------------- |
-| `id`                   | yes          | Dedupe and diff one week's run against the last    | Platform-prefixed, e.g. `finnly:5083188`                 |
-| `rink`                 | yes          | Filter and group by rink                           | Union of the five rink slugs, not the platform           |
-| `surface`              | no           | Several rinks run more than one sheet at once      | Raw string: "South Rink", "SSSC Rink 2", "West Rink"     |
-| `activity`             | yes          | The two categories we care about                   | `public-skate` or `stick-and-puck`                       |
-| `rawTitle`             | yes          | The site's own wording, for display and debugging  | e.g. "Take A Shot"                                       |
-| `startTime`, `endTime` | yes          | The whole point                                    | Local Denver time, no offset, e.g. `2026-10-23T06:00:00` |
-| `sourceUrl`            | yes          | Where to tap to book                               | Best link per platform, below                            |
-| `notes`                | no           | Finnly puts useful context here ("Birthday Party") | Free text                                                |
-| `capacity`             | no (stretch) | Only Big Bear and DU expose it                     | `{ available, total }`                                   |
+| Field                  | Required     | Why                                                | Notes                                                                           |
+| ---------------------- | ------------ | -------------------------------------------------- | ------------------------------------------------------------------------------- |
+| `id`                   | yes          | Dedupe and diff one week's run against the last    | `<platform>:<source id>`: `ezfacility:`, `webtrac:`, `capturepoint:`, `finnly:` |
+| `rink`                 | yes          | Filter and group by rink                           | `big-bear`, `joy-burns`, `edge`, `south-sub`, `family-sports`                   |
+| `surface`              | no           | Several rinks run more than one sheet at once      | Raw string: "South Rink", "SSSC Rink 2", "West Rink"                            |
+| `activity`             | yes          | The two categories we care about                   | `public-skate` or `stick-and-puck`                                              |
+| `rawTitle`             | yes          | The site's own wording, for display and debugging  | e.g. "Take A Shot"                                                              |
+| `startTime`, `endTime` | yes          | The whole point                                    | Local Denver time, no offset, e.g. `2026-10-23T06:00:00`                        |
+| `sourceUrl`            | yes          | Where to tap to book                               | Best link per platform, below                                                   |
+| `notes`                | no           | Finnly puts useful context here ("Birthday Party") | Free text                                                                       |
+| `capacity`             | no (stretch) | Only Big Bear and DU expose it                     | `{ available, total }`, whole numbers                                           |
 
-The scraper output also wants a small envelope: `scrapedAt` plus a per-rink `ok`/`failed` status, which powers the "as of" notice and lets the page say when a rink didn't load.
+The scraper output is a `ScrapeResult` envelope: `scrapedAt`, a `rinks` record with an `ok` or `failed` (+ `error`) status for every rink, and the `sessions` array. That powers the "as of" notice and lets the page say when a rink didn't load.
+
+**Validation rules** (each has a test in `session.test.ts`):
+
+- `startTime`/`endTime` use one canonical form, `YYYY-MM-DDTHH:mm:ss`: no fractional seconds, no `Z`, no offset, and the date must exist. Adapters normalize to this (Big Bear's `.0000000` suffix gets trimmed), which is what makes string comparison safe.
+- `endTime` must be after `startTime`; `capacity.available` must be at most `capacity.total`.
+- `sourceUrl` must be an absolute `http(s)` URL (`z.httpUrl()`), so a relative `/Sessions` is rejected.
+- Every object is strict: unknown keys are rejected, so a misspelled optional field fails loudly instead of vanishing.
+- `rinks` must contain exactly the five rink slugs; `scrapedAt` is a UTC instant (`new Date().toISOString()`), unlike session times.
 
 **Time zones:** every rink is local, so `startTime`/`endTime` stay as the offset-free wall-clock strings the sites give us, with no conversion. Two guardrails: set `TZ=America/Denver` wherever the scraper runs (Actions runners and containers default to UTC, which would skew "this week"), and don't turn the strings into `Date` objects in the scraper (JS reads offset-free timestamps as the machine's local time). Use string comparison or `Temporal.PlainDateTime` for date math.
 
@@ -48,7 +56,7 @@ The scraper output also wants a small envelope: `scrapedAt` plus a per-rink `ok`
 | Format                | JSON from the `FilterResults` XHR | HTML month calendar per section                                                            | HTML program detail page                                            | HTML with a JSON-parseable `_onlineScheduleList = [...]` in a script tag |
 | Requests per run      | 1 (if one range covers the week)  | 1 per section per month (4 stick and puck sections in the sample)                          | 1 per program per season                                            | 1 per rink; the sample covers ~8 months                                  |
 | One session =         | array item                        | `a.calendar__block`                                                                        | `table.cat-table-schedule tbody tr`                                 | array item                                                               |
-| `startTime`/`endTime` | `startTime`, `endTime`            | href `ARItemBeginDate` (MM/DD/YYYY) + `ARItemBeginTime`/`EndTime` (seconds since midnight) | cells `class-date` + `class-start-time`/`class-end-time` (12:00 PM) | `EventStartTime`, `EventEndTime`                                         |
+| `startTime`/`endTime` | `start`, `end`                    | href `ARItemBeginDate` (MM/DD/YYYY) + `ARItemBeginTime`/`EndTime` (seconds since midnight) | cells `class-date` + `class-start-time`/`class-end-time` (12:00 PM) | `EventStartTime`, `EventEndTime`                                         |
 | Activity label        | `title`                           | link text, or known from the primarycode fetched                                           | known from the program fetched                                      | `EventTypeName`                                                          |
 | Surface               | `resourceName`                    | not shown                                                                                  | `class-location`                                                    | `FacilityName`                                                           |
 | Source id             | `id`                              | none: FMID + date + begin time                                                             | none: program_id + date + start                                     | `EventId`                                                                |
@@ -66,15 +74,18 @@ Match exact labels per adapter (a regex like `/skate/i` would catch Learn To Ska
 
 ## Decisions
 
-| Decision           | Choice                                                    | Why                                                                                                                                          |
-| ------------------ | --------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| Language           | TypeScript everywhere (Node scraper, React front end)     | One language and shared types end to end; Playwright is Node-native; .NET felt too heavy for this size of project                            |
-| Architecture       | Option C: static pipeline, containerized from day one     | A scheduled scraper writes `sessions.json`, a static React page reads it; free to host, and it can grow into a K8s CronJob without a rewrite |
-| Hosting            | GitHub Actions on a weekly schedule, page on GitHub Pages | No server to run or pay for                                                                                                                  |
-| K8s practice       | Scraper as a CronJob on a local kind or k3d cluster       | Real Kubernetes experience without a cloud bill                                                                                              |
-| Data model         | One shared `Session` zod schema and type                  | TS types vanish at runtime, so scraped data is validated at the boundary                                                                     |
-| Adapters           | One per platform behind a common interface                | Five rinks share four platforms; adding a rink should be config, not code                                                                    |
-| Scraping etiquette | Rare requests (weekly) with a clear User-Agent            | robots.txt isn't binding, but we want to be friendly to these sites and never cause them trouble                                             |
+| Decision           | Choice                                                                  | Why                                                                                                                                                            |
+| ------------------ | ----------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Language           | TypeScript everywhere (Node scraper, React front end)                   | One language and shared types end to end; Playwright is Node-native; .NET felt too heavy for this size of project                                              |
+| Architecture       | Option C: static pipeline, containerized from day one                   | A scheduled scraper writes `sessions.json`, a static React page reads it; free to host, and it can grow into a K8s CronJob without a rewrite                   |
+| Hosting            | GitHub Actions on a weekly schedule, page on GitHub Pages               | No server to run or pay for                                                                                                                                    |
+| K8s practice       | Scraper as a CronJob on a local kind or k3d cluster                     | Real Kubernetes experience without a cloud bill                                                                                                                |
+| Data model         | One shared `Session` zod schema and type                                | TS types vanish at runtime, so scraped data is validated at the boundary                                                                                       |
+| Monorepo tooling   | pnpm workspaces, no Turborepo; shared package is source-only            | Small repo; no build step for `packages/shared`                                                                                                                |
+| Time values        | Session times as local wall-clock strings; `scrapedAt` as a UTC instant | Rink times mean "local time" by definition; `Date` would shift them on a UTC runner. Date math via `Temporal.PlainDateTime` (polyfill, since Node 24 lacks it) |
+| Schema strictness  | `z.strictObject` everywhere                                             | We produce this data ourselves, so an unexpected key is a bug to surface, not ignore                                                                           |
+| Adapters           | One per platform behind a common interface                              | Five rinks share four platforms; adding a rink should be config, not code                                                                                      |
+| Scraping etiquette | Rare requests (weekly) with a clear User-Agent                          | robots.txt isn't binding, but we want to be friendly to these sites and never cause them trouble                                                               |
 
 Options considered and set aside: Python (no edge over TS here, and off Val's interview stack), a .NET scraper, and a full API plus Postgres on a cloud cluster (cost and upkeep for one user).
 
@@ -82,12 +93,25 @@ Options considered and set aside: Python (no edge over TS here, and off Val's in
 
 Four steps, each ending in a PR Val writes and Claude reviews.
 
-1. [ ] **Recon, no code.** For each platform, use DevTools to find the request that returns sessions: URL, parameters (date range, facility ID), tokens or cookies, and whether it works logged out. Check for iCal or export feeds. Deliverable: notes per platform in `research.md`.
+1. [x] **Recon, no code.** For each platform, use DevTools to find the request that returns sessions: URL, parameters (date range, facility ID), tokens or cookies, and whether it works logged out. Check for iCal or export feeds. Deliverable: notes per platform in `research.md`.
 2. [ ] **Skeleton and first adapter.** Monorepo with `scraper`, `web`, and a shared package holding the `Session` schema. Big Bear adapter with Vitest tests against saved responses, and a CLI that writes `sessions.json`.
+   - [x] Monorepo scaffold (PR #1)
+   - [x] Shared schema: `Session`, `RinkStatus`, `ScrapeResult` with tests (PR #2)
+   - [ ] Big Bear adapter and CLI (see Next up)
 3. [ ] **Remaining adapters and the week view.** Three more adapters, activity-name normalization, a React/Vite week grid filterable by rink and activity, and a weekly GitHub Actions job that scrapes and deploys to Pages.
 4. [ ] **Containers, K8s and email.** Dockerfile, manifests or a Helm chart running the scraper as a CronJob on kind, and a weekly email digest.
 
 Stretch: filter sessions against Val's own schedule.
+
+## Next up
+
+The Big Bear adapter and the CLI, in small PRs:
+
+1. **Capture Big Bear's `FilterResults` request** in DevTools (URL, method, body) and save one week's response as a committed fixture, e.g. `apps/scraper/test/fixtures/bigbear.json`. `research/` is gitignored, so tests can't read from it.
+2. **Design the adapter interface** (discussion first). Likely split `fetch` (network) from `parse` (raw response to `Session[]`), so parsing is a pure function tested against the fixture with no network.
+3. **Big Bear `parse` + tests:** field mapping, trimming `.0000000`, exact-label activity mapping, dropping everything else, logging unknown labels, and building the `ezfacility:` id.
+4. **Big Bear `fetch`:** built-in `fetch`, a clear User-Agent, and the date range for the current week.
+5. **CLI:** run adapters, catch per-rink failures into `RinkStatus`, build a `ScrapeResult`, validate it, write `sessions.json`. Runs with `TZ=America/Denver`.
 
 ## How we work together
 
@@ -111,7 +135,7 @@ Val writes the code; Claude mentors and reviews. The aim is that Val can explain
 
 - [x] robots.txt stance for WebTrac, CapturePoint and Finnly. **Answer:** rare requests to start; be friendly to these sites and avoid causing them any trouble.
 - [x] Do any platforms need a login or session token to list sessions? **Answer:** all schedules appear to be publicly available (confirm during recon).
-- [ ] Monorepo tooling: pnpm workspaces, npm workspaces, or Turborepo?
+- [x] Monorepo tooling: pnpm workspaces, npm workspaces, or Turborepo? **Answer:** pnpm workspaces (PR #1).
 - [ ] Weekly email provider, decided at step 4
 - [ ] Redact the live cookie values in the pasted curl in `research/du.md` before committing
 - [ ] Big Bear: capture the `FilterResults` request (URL, method, body); can one call cover a full week?
@@ -121,3 +145,6 @@ Val writes the code; Claude mentors and reviews. The aim is that Val can explain
 - [ ] Include Silver Skates, Public Skate/Learn to Skate, and Family Stick & Puck?
 - [ ] `research/` sits at the repo root, but this file and CLAUDE.md say `docs/research` (and link `research.md`); move the folder or fix the references
 - [x] When do we add filtering against Val's own schedule? **Answer:** stretch goal toward the end.
+- [ ] Tighten `id` validation (non-empty, `<platform>:` prefix)? Decide in the Big Bear adapter PR.
+- [ ] Which `Temporal` polyfill for the week view? Node 24 has no global `Temporal`.
+- [ ] Are Finnly `EventId`s unique across both SSPRD rinks? Check against the two samples when writing the Finnly adapter.

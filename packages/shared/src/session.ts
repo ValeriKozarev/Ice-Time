@@ -18,7 +18,7 @@ export const Rink = z.enum([
 ]);
 export const Session = z
   .strictObject({
-    id: z.string(),
+    id: z.string().min(1),
     rink: Rink,
     activity: Activity,
     rawTitle: z.string(),
@@ -54,6 +54,7 @@ export const ScrapeResult = z.strictObject({
   rinks: z.record(Rink, RinkStatus),
   sessions: z.array(Session),
 });
+
 // and corresponding types should have the same name
 export type Activity = z.infer<typeof Activity>;
 export type Rink = z.infer<typeof Rink>;

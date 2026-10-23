@@ -9,7 +9,7 @@ import {
 } from "./session";
 
 const validSession = {
-  id: "finnly:12345",
+  id: "ezfacility:12345",
   rink: "big-bear",
   activity: "public-skate",
   rawTitle: "Public Skate",
