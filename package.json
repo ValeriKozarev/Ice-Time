@@ -1,0 +1,29 @@
+{
+  "name": "ice-time",
+  "private": true,
+  "description": "A small app to scrape and display ice times from my local rinks",
+  "scripts": {
+    "test": "vitest",
+    "typecheck": "pnpm -r typecheck",
+    "format": "prettier --write .",
+    "lint": "oxlint"
+  },
+  "author": "Val Kozarev",
+  "license": "GPL-3.0-only",
+  "devEngines": {
+    "packageManager": {
+      "name": "pnpm",
+      "version": "12.15.0",
+      "onFail": "download"
+    }
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "type": "module",
+  "devDependencies": {
+    "prettier": "^3.9.10",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.5"
+  }
+}
