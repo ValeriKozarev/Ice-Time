@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { Activity, LocalDateTime, Rink } from "./session";
+import { Activity, LocalDateTime, Rink, Session } from "./session";
 
 describe("Activity", () => {
   it("accepts a known activity", () => {
@@ -44,5 +44,39 @@ describe("LocalDateTime", () => {
 
   it("rejects an invalid date", () => {
     expect(() => LocalDateTime.parse("2026-02-30T06:00:00")).toThrow();
+  });
+});
+
+describe("Session", () => {
+  const validSession = {
+    id: "finnly:12345",
+    rink: "big-bear",
+    activity: "public-skate",
+    rawTitle: "Public Skate",
+    startTime: "2026-10-23T06:00:00",
+    endTime: "2026-10-23T07:00:00",
+    sourceUrl: "https://bigbearicearena.ezfacility.com/Sessions",
+  } satisfies Session;
+
+  it("accepts a valid session", () => {
+    expect(() => Session.parse(validSession)).not.toThrow();
+  });
+
+  it("rejects a session with an invalid rink", () => {
+    const invalidSession = { ...validSession, rink: "invalid-rink" };
+    expect(() => Session.parse(invalidSession)).toThrow();
+  });
+
+  it("rejects a session with an invalid activity", () => {
+    const invalidSession = {
+      ...validSession,
+      activity: "invalid-activity",
+    };
+    expect(() => Session.parse(invalidSession)).toThrow();
+  });
+
+  it("rejects a session with an invalid URL", () => {
+    const invalidSession = { ...validSession, sourceUrl: "/Sessions" };
+    expect(() => Session.parse(invalidSession)).toThrow();
   });
 });

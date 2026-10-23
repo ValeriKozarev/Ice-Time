@@ -25,35 +25,35 @@ Five rinks sit on four booking platforms, so the scraper needs four adapters, no
 
 Worked out from the samples in `research/` on 2026-10-23 (full analysis in [research/schema-field-mapping.md](../research/schema-field-mapping.md), kept local and uncommitted). This is the starting point for the `Session` zod schema; the schema itself is still Val's to write.
 
-| Field          | Required     | Why                                                | Notes                                                    |
-| -------------- | ------------ | -------------------------------------------------- | -------------------------------------------------------- |
-| `id`           | yes          | Dedupe and diff one week's run against the last    | Platform-prefixed, e.g. `finnly:5083188`                 |
-| `rink`         | yes          | Filter and group by rink                           | Union of the five rink slugs, not the platform           |
-| `surface`      | no           | Several rinks run more than one sheet at once      | Raw string: "South Rink", "SSSC Rink 2", "West Rink"     |
-| `activity`     | yes          | The two categories we care about                   | `public-skate` or `stick-and-puck`                       |
-| `rawTitle`     | yes          | The site's own wording, for display and debugging  | e.g. "Take A Shot"                                       |
-| `start`, `end` | yes          | The whole point                                    | Local Denver time, no offset, e.g. `2026-10-23T06:00:00` |
-| `sourceUrl`    | yes          | Where to tap to book                               | Best link per platform, below                            |
-| `notes`        | no           | Finnly puts useful context here ("Birthday Party") | Free text                                                |
-| `capacity`     | no (stretch) | Only Big Bear and DU expose it                     | `{ available, total }`                                   |
+| Field                  | Required     | Why                                                | Notes                                                    |
+| ---------------------- | ------------ | -------------------------------------------------- | -------------------------------------------------------- |
+| `id`                   | yes          | Dedupe and diff one week's run against the last    | Platform-prefixed, e.g. `finnly:5083188`                 |
+| `rink`                 | yes          | Filter and group by rink                           | Union of the five rink slugs, not the platform           |
+| `surface`              | no           | Several rinks run more than one sheet at once      | Raw string: "South Rink", "SSSC Rink 2", "West Rink"     |
+| `activity`             | yes          | The two categories we care about                   | `public-skate` or `stick-and-puck`                       |
+| `rawTitle`             | yes          | The site's own wording, for display and debugging  | e.g. "Take A Shot"                                       |
+| `startTime`, `endTime` | yes          | The whole point                                    | Local Denver time, no offset, e.g. `2026-10-23T06:00:00` |
+| `sourceUrl`            | yes          | Where to tap to book                               | Best link per platform, below                            |
+| `notes`                | no           | Finnly puts useful context here ("Birthday Party") | Free text                                                |
+| `capacity`             | no (stretch) | Only Big Bear and DU expose it                     | `{ available, total }`                                   |
 
 The scraper output also wants a small envelope: `scrapedAt` plus a per-rink `ok`/`failed` status, which powers the "as of" notice and lets the page say when a rink didn't load.
 
-**Time zones:** every rink is local, so `start`/`end` stay as the offset-free wall-clock strings the sites give us, with no conversion. Two guardrails: set `TZ=America/Denver` wherever the scraper runs (Actions runners and containers default to UTC, which would skew "this week"), and don't turn the strings into `Date` objects in the scraper (JS reads offset-free timestamps as the machine's local time). Use string comparison or `Temporal.PlainDateTime` for date math.
+**Time zones:** every rink is local, so `startTime`/`endTime` stay as the offset-free wall-clock strings the sites give us, with no conversion. Two guardrails: set `TZ=America/Denver` wherever the scraper runs (Actions runners and containers default to UTC, which would skew "this week"), and don't turn the strings into `Date` objects in the scraper (JS reads offset-free timestamps as the machine's local time). Use string comparison or `Temporal.PlainDateTime` for date math.
 
 ### Extraction per platform
 
-|                  | Big Bear (EZFacility)             | DU (WebTrac)                                                                               | Edge (CapturePoint)                                                 | SSPRD x2 (Finnly)                                                        |
-| ---------------- | --------------------------------- | ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------- | ------------------------------------------------------------------------ |
-| Format           | JSON from the `FilterResults` XHR | HTML month calendar per section                                                            | HTML program detail page                                            | HTML with a JSON-parseable `_onlineScheduleList = [...]` in a script tag |
-| Requests per run | 1 (if one range covers the week)  | 1 per section per month (4 stick and puck sections in the sample)                          | 1 per program per season                                            | 1 per rink; the sample covers ~8 months                                  |
-| One session =    | array item                        | `a.calendar__block`                                                                        | `table.cat-table-schedule tbody tr`                                 | array item                                                               |
-| `start`/`end`    | `start`, `end`                    | href `ARItemBeginDate` (MM/DD/YYYY) + `ARItemBeginTime`/`EndTime` (seconds since midnight) | cells `class-date` + `class-start-time`/`class-end-time` (12:00 PM) | `EventStartTime`, `EventEndTime`                                         |
-| Activity label   | `title`                           | link text, or known from the primarycode fetched                                           | known from the program fetched                                      | `EventTypeName`                                                          |
-| Surface          | `resourceName`                    | not shown                                                                                  | `class-location`                                                    | `FacilityName`                                                           |
-| Source id        | `id`                              | none: FMID + date + begin time                                                             | none: program_id + date + start                                     | `EventId`                                                                |
-| `sourceUrl`      | `/Sessions`                       | month calendar URL (never the add-to-cart href)                                            | `cat_program_list_detail.cfm?season_id=…&program_id=…`              | `/schedule/246` or `/247`                                                |
-| Capacity         | `classSize - currentClassSize`    | text "14 of 30 Available"                                                                  | none without login                                                  | none                                                                     |
+|                       | Big Bear (EZFacility)             | DU (WebTrac)                                                                               | Edge (CapturePoint)                                                 | SSPRD x2 (Finnly)                                                        |
+| --------------------- | --------------------------------- | ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| Format                | JSON from the `FilterResults` XHR | HTML month calendar per section                                                            | HTML program detail page                                            | HTML with a JSON-parseable `_onlineScheduleList = [...]` in a script tag |
+| Requests per run      | 1 (if one range covers the week)  | 1 per section per month (4 stick and puck sections in the sample)                          | 1 per program per season                                            | 1 per rink; the sample covers ~8 months                                  |
+| One session =         | array item                        | `a.calendar__block`                                                                        | `table.cat-table-schedule tbody tr`                                 | array item                                                               |
+| `startTime`/`endTime` | `startTime`, `endTime`            | href `ARItemBeginDate` (MM/DD/YYYY) + `ARItemBeginTime`/`EndTime` (seconds since midnight) | cells `class-date` + `class-start-time`/`class-end-time` (12:00 PM) | `EventStartTime`, `EventEndTime`                                         |
+| Activity label        | `title`                           | link text, or known from the primarycode fetched                                           | known from the program fetched                                      | `EventTypeName`                                                          |
+| Surface               | `resourceName`                    | not shown                                                                                  | `class-location`                                                    | `FacilityName`                                                           |
+| Source id             | `id`                              | none: FMID + date + begin time                                                             | none: program_id + date + start                                     | `EventId`                                                                |
+| `sourceUrl`           | `/Sessions`                       | month calendar URL (never the add-to-cart href)                                            | `cat_program_list_detail.cfm?season_id=…&program_id=…`              | `/schedule/246` or `/247`                                                |
+| Capacity              | `classSize - currentClassSize`    | text "14 of 30 Available"                                                                  | none without login                                                  | none                                                                     |
 
 ### Activity normalization
 

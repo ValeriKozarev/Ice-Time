@@ -16,7 +16,17 @@ export const Rink = z.enum([
   "south-sub",
   "joy-burns",
 ]);
+export const Session = z.object({
+  id: z.string(),
+  rink: Rink,
+  activity: Activity,
+  rawTitle: z.string(),
+  startTime: LocalDateTime,
+  endTime: LocalDateTime,
+  sourceUrl: z.httpUrl(),
+});
 
 // and corresponding types should have the same name
 export type Activity = z.infer<typeof Activity>;
 export type Rink = z.infer<typeof Rink>;
+export type Session = z.infer<typeof Session>;
