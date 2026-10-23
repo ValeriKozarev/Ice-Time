@@ -2,7 +2,10 @@
   "name": "ice-time",
   "private": true,
   "description": "A small app to scrape and display ice times from my local rinks",
-  "scripts": {},
+  "scripts": { 
+    "test": "vitest",
+    "typecheck": "pnpm -r typecheck"
+  },
   "author": "Val Kozarev",
   "license": "GPL-3.0-only",
   "devEngines": {
