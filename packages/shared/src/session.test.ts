@@ -1,5 +1,12 @@
 import { describe, it, expect } from "vitest";
-import { Activity, LocalDateTime, Rink, RinkStatus, ScrapeResult, Session } from "./session";
+import {
+  Activity,
+  LocalDateTime,
+  Rink,
+  RinkStatus,
+  ScrapeResult,
+  Session,
+} from "./session";
 
 const validSession = {
   id: "finnly:12345",
@@ -72,6 +79,11 @@ describe("Session", () => {
       ...validSession,
       activity: "invalid-activity",
     };
+    expect(() => Session.parse(invalidSession)).toThrow();
+  });
+
+  it("rejects a session with an invalid property", () => {
+    const invalidSession = { ...validSession, note: "type for notes field" };
     expect(() => Session.parse(invalidSession)).toThrow();
   });
 
@@ -185,7 +197,10 @@ describe("ScrapeResult", () => {
     const withoutEdge = Object.fromEntries(
       Object.entries(allOk).filter(([rink]) => rink !== "edge"),
     );
-    const result = ScrapeResult.safeParse({ ...validResult, rinks: withoutEdge });
+    const result = ScrapeResult.safeParse({
+      ...validResult,
+      rinks: withoutEdge,
+    });
     expect(result.success).toBe(false);
     expect(result.error?.issues[0]?.path).toEqual(["rinks", "edge"]);
   });
