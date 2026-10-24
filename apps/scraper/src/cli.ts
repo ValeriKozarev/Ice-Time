@@ -1,10 +1,9 @@
 import { fetchBigBear, parseBigBear } from "./adapters/big-bear";
+import { upcomingWeek } from "./week-util";
 import { ScrapeResult, Session } from "@ice-time/shared";
 import { writeFileSync } from "node:fs";
 
 import type { Rink, RinkStatus } from "@ice-time/shared";
-
-console.log("scraper is running, TZ = ", process.env.TZ);
 
 const rinks: Record<Rink, RinkStatus> = {
   "big-bear": { status: "failed", error: "not run" },
@@ -14,15 +13,18 @@ const rinks: Record<Rink, RinkStatus> = {
   "family-sports": { status: "failed", error: "adapter not written yet" },
 };
 
-// test data for now, this will be automated for weekly reporting
-const weekStart = "2026-10-26";
-const weekEnd = "2026-11-01";
+console.log("scraper is running, TZ = ", process.env.TZ);
+
+const today = new Intl.DateTimeFormat("en-CA", {
+  timeZone: "America/Denver",
+}).format(new Date());
+const { start, end } = upcomingWeek(today);
 
 const sessions: Session[] = [];
 
 try {
   // just focusing on Big Bear to start
-  const candidates = parseBigBear(await fetchBigBear(weekStart, weekEnd));
+  const candidates = parseBigBear(await fetchBigBear(start, end));
 
   for (const candidate of candidates) {
     const result = Session.safeParse(candidate);
