@@ -99,7 +99,7 @@ Four steps, each ending in a PR Val writes and Claude reviews.
 2. [ ] **Skeleton and first adapter.** Monorepo with `scraper`, `web`, and a shared package holding the `Session` schema. Big Bear adapter with Vitest tests against saved responses, and a CLI that writes `sessions.json`.
    - [x] Monorepo scaffold (PR #1)
    - [x] Shared schema: `Session`, `RinkStatus`, `ScrapeResult` with tests (PR #2)
-   - [ ] Big Bear adapter and CLI (see Next up). In progress on branch `big-bear-adapter`: `parseBigBear` and its fixture tests are done
+   - [x] Big Bear adapter and CLI (branch `big-bear-adapter`; first live run wrote 42 sessions for Oct 26 to Nov 1)
 3. [ ] **Remaining adapters and the week view.** Three more adapters, activity-name normalization, a React/Vite week grid filterable by rink and activity, and a weekly GitHub Actions job that scrapes and deploys to Pages.
 4. [ ] **Containers, K8s and email.** Dockerfile, manifests or a Helm chart running the scraper as a CronJob on kind, and a weekly email digest.
 
@@ -112,8 +112,16 @@ The Big Bear adapter and the CLI, in small PRs:
 1. [x] **Capture Big Bear's `FilterResults` request** and save a fixture. Request recon is in `research/bigbear.md`; fixture at `apps/scraper/test/fixtures/bigbear-2026-10-23.json`.
 2. [x] **Adapter shape:** split `fetch` (network) from `parse` (pure, tested against the fixture). The shared adapter interface is deferred until a second adapter exists, so it's designed from two real examples rather than one.
 3. [x] **Big Bear `parse` + tests:** raw-response schema (plain `z.object`, only the fields used), exact-label activity map, `flatMap` to drop other activities, `.slice(0, 19)` for times, `ezfacility:` id, surface and capacity. Tests: 57 of 86 kept, one item mapped exactly, every output passes `Session.safeParse`. Still to do: log labels we haven't seen.
-4. [ ] **Big Bear `fetch`:** built-in `fetch`, a clear User-Agent, the minimal form body from `research/bigbear.md` built with `URLSearchParams`, and the upcoming Mon to Sun dates. Check `content-type` is JSON, since failures arrive as a redirect to an HTML error page.
-5. [ ] **CLI:** compute next Mon to Sun in Denver time, run adapters, catch per-rink failures into `RinkStatus`, `Session.safeParse` each row (skip and log bad ones), build and `ScrapeResult.parse` the result, write `apps/web/public/sessions.json` (gitignored). Runs with `TZ=America/Denver`.
+4. [x] **Big Bear `fetch`:** built-in `fetch` with a project User-Agent, the minimal form body built with `URLSearchParams`, and two checks: `res.ok` and a JSON `content-type` (failures arrive as a redirect to an HTML error page). Tests stub the global `fetch` per test with `vi.stubGlobal`, so `pnpm test` never contacts Big Bear.
+5. [x] **CLI:** `upcomingWeek(today)` in `week-util.ts` computes the next Mon to Sun (a Monday run skips to the following week) with plain `Date` math pinned to UTC midnight; today's Denver date comes from `Intl.DateTimeFormat("en-CA", { timeZone: "America/Denver" })`. The CLI starts every rink as `failed` (unwritten adapters stay that way), runs Big Bear in its own try/catch, `Session.safeParse`s each row (skip and log bad ones), `ScrapeResult.parse`s the result and writes `apps/web/public/sessions.json` (gitignored).
+
+**After this PR (plan step 3):**
+
+1. **Finnly adapter** (South Suburban and Family Sports): one request per rink, the session array is JSON inside a `<script>` tag. Decide how to extract it first (string slicing vs `vm` vs an HTML parser).
+2. **Extract the shared adapter interface** once two adapters exist, likely `{ rink(s), fetch, parse }`, so the CLI loops over adapters instead of naming each one.
+3. **Edge (CapturePoint) and DU (WebTrac) adapters:** HTML parsing, so a parser dependency (e.g. cheerio) needs discussing first.
+4. **Week view** in `apps/web`, then a weekly GitHub Actions job (Sunday evening Denver) that scrapes and deploys to Pages.
+5. Small leftovers: log activity labels we haven't seen; log the error when a rink fails, not just record it in the JSON.
 
 ## How we work together
 
@@ -149,5 +157,5 @@ Val writes the code; Claude mentors and reviews. The aim is that Val can explain
 - [x] When do we add filtering against Val's own schedule? **Answer:** stretch goal toward the end.
 - [ ] Report skipped rows? Maybe `{ status: "ok", skipped: n }` in `RinkStatus` once a real scrape actually skips something.
 - [ ] Tighten `id` validation (non-empty, `<platform>:` prefix)? Decide in the Big Bear adapter PR.
-- [ ] Which `Temporal` polyfill for the week view? Node 24 has no global `Temporal`.
+- [ ] Which `Temporal` polyfill for the week view? Node 24 has no global `Temporal`. The CLI's week math uses plain UTC-midnight `Date` instead (Val's choice, 2026-10-24); if the week view needs one, `temporal-polyfill` (v1.0.6, MIT, actively maintained) looked like the better option over `@js-temporal/polyfill` (v0.5.1).
 - [ ] Are Finnly `EventId`s unique across both SSPRD rinks? Check against the two samples when writing the Finnly adapter.
