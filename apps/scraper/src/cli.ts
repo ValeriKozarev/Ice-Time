@@ -6,23 +6,16 @@ import { writeFileSync } from "node:fs";
 
 import type { Rink, RinkStatus } from "@ice-time/shared";
 
-const rinks: Record<Rink, RinkStatus> = {
-  "big-bear": { status: "failed", error: "not run" },
-  edge: { status: "failed", error: "adapter not written yet" },
-  "joy-burns": { status: "failed", error: "adapter not written yet" },
-  "south-sub": { status: "failed", error: "adapter not written yet" },
-  "family-sports": { status: "failed", error: "adapter not written yet" },
-};
+const sessions: Session[] = [];
 
 const today = new Intl.DateTimeFormat("en-CA", {
   timeZone: "America/Denver",
 }).format(new Date());
 const { start, end } = upcomingWeek(today);
-// const start = "2026-10-26"
-// const end = "2026-11-01"
 
 type Adapter = { rink: Rink; scrape: () => Promise<Session[]> };
 
+// adapters holds the mappings for each rink and what methods to call
 const adapters: Adapter[] = [
   // this one accepts a date range so we compute it programmatically
   {
@@ -32,15 +25,25 @@ const adapters: Adapter[] = [
   // the finnly sites return months of data in one huge HTML response which we will trim later
   {
     rink: "south-sub",
-    scrape: async () => parseFinnly(await fetchFinnly("south-sub"), "south-sub"),
+    scrape: async () =>
+      parseFinnly(await fetchFinnly("south-sub"), "south-sub"),
   },
   {
     rink: "family-sports",
-    scrape: async () => parseFinnly(await fetchFinnly("family-sports"), "family-sports"),
+    scrape: async () =>
+      parseFinnly(await fetchFinnly("family-sports"), "family-sports"),
   },
+  // TODO: still need to write the adapters for edge and joy-burns
 ];
 
-const sessions: Session[] = [];
+// rinks on the other hand is used for reporting, we update this as part of the for loop below and then write to file
+const rinks: Record<Rink, RinkStatus> = {
+  "big-bear": { status: "failed", error: "not run" },
+  edge: { status: "failed", error: "adapter not written yet" },
+  "joy-burns": { status: "failed", error: "adapter not written yet" },
+  "south-sub": { status: "failed", error: "not run" },
+  "family-sports": { status: "failed", error: "not run" },
+};
 
 // helper which will run the corresponding scrape and parse flow for the given rink based on the mapping we've defined
 async function runAdapter(rink: Rink, scrape: () => Promise<Session[]>) {
@@ -57,14 +60,17 @@ async function runAdapter(rink: Rink, scrape: () => Promise<Session[]>) {
       if (result.success) {
         sessions.push(result.data);
       } else {
-        console.warn(`skipping invalid ${rink} session`, candidate.id, result.error.issues);
+        console.warn(
+          `skipping invalid ${rink} session`,
+          candidate.id,
+          result.error.issues,
+        );
       }
     }
 
     // mark this rink as a success
     rinks[rink] = { status: "ok" };
-  }
-  catch (error) { 
+  } catch (error) {
     // else we need to capture why this rink failed for us
     rinks[rink] = {
       status: "failed",

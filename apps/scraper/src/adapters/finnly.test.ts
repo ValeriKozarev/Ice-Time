@@ -4,28 +4,38 @@ import { fetchFinnly, stripFinnlyHtml, parseFinnly } from "./finnly";
 import { Session } from "@ice-time/shared";
 
 const southSubFixture = readFileSync(
-  new URL("../../test/fixtures/finnly-south-sub-2026-10-23.txt", import.meta.url),
+  new URL(
+    "../../test/fixtures/finnly-south-sub-2026-10-23.txt",
+    import.meta.url,
+  ),
   "utf8",
 );
 const familySportsFixture = readFileSync(
-  new URL("../../test/fixtures/finnly-family-sports-2026-10-23.txt", import.meta.url),
+  new URL(
+    "../../test/fixtures/finnly-family-sports-2026-10-23.txt",
+    import.meta.url,
+  ),
   "utf8",
 );
 
 describe("Finnly Adapter, HTML stripping ", () => {
   it("We throw when starting marker is missing when stripping HTML response", () => {
-    expect(() => stripFinnlyHtml("_facilityList = [];")).toThrow("no _onlineScheduleList");
+    expect(() => stripFinnlyHtml("_facilityList = [];")).toThrow(
+      "no _onlineScheduleList",
+    );
   });
 
   it("We throw when ending marker is missing when stripping HTML response", () => {
-    expect(() => stripFinnlyHtml('_onlineScheduleList = [{"EventId":1}')).toThrow("no ending");
+    expect(() =>
+      stripFinnlyHtml('_onlineScheduleList = [{"EventId":1}'),
+    ).toThrow("no ending");
   });
 
   it("Successfully parses HTML response to JSON (32 objects in South Sub fixture)", () => {
     const data = stripFinnlyHtml(southSubFixture);
     expect(Array.isArray(data)).toBe(true);
     expect(data).toHaveLength(32);
-  })
+  });
 });
 
 describe("Finnly Adapter, South Sub (parse)", () => {
@@ -48,22 +58,31 @@ describe("Finnly Adapter, South Sub (parse)", () => {
       endTime: "2026-10-15T10:25:00",
       sourceUrl: "https://ssprd.finnlyconnect.com/schedule/247",
       surface: "SSSC Rink 1",
-      notes: ""
+      notes: "",
     } satisfies Session;
-    
-    expect(parseFinnly(stripFinnlyHtml(southSubFixture), "south-sub").find((s) => s.id === "finnly:6367642")).toEqual(expectedSession);
-  })
+
+    expect(
+      parseFinnly(stripFinnlyHtml(southSubFixture), "south-sub").find(
+        (s) => s.id === "finnly:6367642",
+      ),
+    ).toEqual(expectedSession);
+  });
 
   it("Correctly strips out activities we don't care about (7 of 32)", () => {
     const sessions = parseFinnly(stripFinnlyHtml(southSubFixture), "south-sub");
     expect(sessions).toHaveLength(7);
-    expect(sessions.map((s) => s.rawTitle)).not.toContain("Silver Skates - Public Skate");
-  })
+    expect(sessions.map((s) => s.rawTitle)).not.toContain(
+      "Silver Skates - Public Skate",
+    );
+  });
 });
 
 describe("Finnly Adapter, Family Sports (parse)", () => {
   it("Every output passes Session.safeParse", () => {
-    const failures = parseFinnly(stripFinnlyHtml(familySportsFixture), "family-sports")
+    const failures = parseFinnly(
+      stripFinnlyHtml(familySportsFixture),
+      "family-sports",
+    )
       .map((s) => ({ id: s.id, result: Session.safeParse(s) }))
       .filter((r) => !r.result.success);
 
@@ -91,7 +110,10 @@ describe("Finnly Adapter, Family Sports (parse)", () => {
   });
 
   it("Correctly strips out activities we don't care about (4 of 42)", () => {
-    const sessions = parseFinnly(stripFinnlyHtml(familySportsFixture), "family-sports");
+    const sessions = parseFinnly(
+      stripFinnlyHtml(familySportsFixture),
+      "family-sports",
+    );
     expect(sessions).toHaveLength(4);
     expect(sessions.map((s) => s.rawTitle)).not.toContain("Adult Drop In");
   });
@@ -116,7 +138,9 @@ function htmlResponse(body: string, status = 200) {
 
 describe("Finnly Adapter (fetch)", () => {
   it("requests the rink's schedule page with our user agent", async () => {
-    const fake = stubFetch(htmlResponse('_onlineScheduleList = [{"EventId":1}];'));
+    const fake = stubFetch(
+      htmlResponse('_onlineScheduleList = [{"EventId":1}];'),
+    );
     await fetchFinnly("family-sports");
 
     const [url, init] = fake.mock.calls[0]!;
@@ -125,7 +149,9 @@ describe("Finnly Adapter (fetch)", () => {
   });
 
   it("returns the schedule data pulled out of the page", async () => {
-    stubFetch(htmlResponse('<script>_onlineScheduleList = [{"EventId":1}];</script>'));
+    stubFetch(
+      htmlResponse('<script>_onlineScheduleList = [{"EventId":1}];</script>'),
+    );
     await expect(fetchFinnly("south-sub")).resolves.toEqual([{ EventId: 1 }]);
   });
 

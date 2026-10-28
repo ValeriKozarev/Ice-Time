@@ -15,7 +15,8 @@ const FINNLY_RINKS = { "south-sub": 247, "family-sports": 246 } as const;
 export type FinnlyRink = keyof typeof FINNLY_RINKS;
 
 // shorthand for computing the two versions of the URL since we do this more than once
-const scheduleUrl = (rink: FinnlyRink) => `https://ssprd.finnlyconnect.com/schedule/${FINNLY_RINKS[rink]}`;
+const scheduleUrl = (rink: FinnlyRink) =>
+  `https://ssprd.finnlyconnect.com/schedule/${FINNLY_RINKS[rink]}`;
 
 // note: both South Sub and Family Sports rinks use the same Finnly platform, so we'll standardize once on what data we want to capture and use it in both places
 const FinnlyItem = z.object({
@@ -40,7 +41,7 @@ export async function fetchFinnly(rink: FinnlyRink): Promise<unknown> {
   const contentType = res.headers.get("content-type") ?? "";
 
   // then check for structure
-  if (!contentType.includes("text/html")) { 
+  if (!contentType.includes("text/html")) {
     throw new Error(`Finnly (${rink}) returned ${contentType}, not HTML`);
   }
 
