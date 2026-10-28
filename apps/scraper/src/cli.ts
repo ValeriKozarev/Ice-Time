@@ -20,6 +20,8 @@ const today = new Intl.DateTimeFormat("en-CA", {
   timeZone: "America/Denver",
 }).format(new Date());
 const { start, end } = upcomingWeek(today);
+// const start = "2026-10-26"
+// const end = "2026-11-01"
 
 const adapters: Adapter[] = [
   // this one accepts a date range so we compute it programmatically
@@ -49,7 +51,7 @@ async function runAdapter(rink: Rink, scrape: () => Promise<Session[]>) {
       // keep only next Mon-Sun (Finnly returns months of data)
       const day = candidate.startTime.slice(0, 10);
       if (day < start || day > end) continue;
-      
+
       const result = Session.safeParse(candidate);
 
       if (result.success) {
