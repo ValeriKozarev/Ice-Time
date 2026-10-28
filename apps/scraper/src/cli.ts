@@ -45,7 +45,7 @@ const rinks: Record<Rink, RinkStatus> = {
   "family-sports": { status: "failed", error: "not run" },
 };
 
-// helper which will run the corresponding scrape and parse flow for the given rink based on the mapping we've defined
+// helper which will run the code based on the mappings defined above and also update rink statuses
 async function runAdapter(rink: Rink, scrape: () => Promise<Session[]>) {
   try {
     const candidates = await scrape();
@@ -79,7 +79,7 @@ async function runAdapter(rink: Rink, scrape: () => Promise<Session[]>) {
   }
 }
 
-// this is the actual driver that will iterate over our rinks
+// this is the actual driver that will iterate over our rinks, after we've looped over the rinks we will write everything to disk
 for (const adapter of adapters) {
   console.log(`scraping ${adapter.rink}...`);
   await runAdapter(adapter.rink, adapter.scrape);

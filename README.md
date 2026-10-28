@@ -4,7 +4,7 @@ Finds Public Skate and Stick and Puck sessions across five Denver-metro ice rink
 
 A scraper runs once a week, normalizes each rink's schedule into a shared `Session` shape, and writes `sessions.json`. A static React page reads that file. No server, no database.
 
-**Status:** early. The monorepo is scaffolded and the shared data schema is done (`packages/shared/src/session.ts`). Next up is the first rink adapter (Big Bear) and the scraper CLI. See [docs/plan.md](docs/plan.md) for the plan, decisions and next steps.
+**Status:** the scraper works for three of the five rinks: Big Bear (EZFacility) and South Suburban and Family Sports (Finnly). Edge and DU Joy Burns adapters come next, then the week view in `apps/web` and a weekly GitHub Actions deploy. See [docs/plan.md](docs/plan.md) for the plan, decisions and next steps.
 
 ## Stack
 
