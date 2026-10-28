@@ -11,8 +11,11 @@ const ACTIVITIES: Record<string, Activity> = {
   "Take A Shot": "stick-and-puck",
 };
 
+// shorthand for computing the two versions of the URL since we do this more than once
+const scheduleUrl = (rink: FinnlyRink) => `https://ssprd.finnlyconnect.com/schedule/${FINNLY_RINKS[rink]}`;
+
 const FINNLY_RINKS = { "south-sub": 247, "family-sports": 246 } as const;
-type FinnlyRink = keyof typeof FINNLY_RINKS;
+export type FinnlyRink = keyof typeof FINNLY_RINKS;
 
 // note: both South Sub and Family Sports rinks use the same Finnly platform, so we'll standardize once on what data we want to capture and use it in both places
 const FinnlyItem = z.object({
@@ -25,7 +28,26 @@ const FinnlyItem = z.object({
 });
 const FinnlyResponse = z.array(FinnlyItem);
 
-// TODO: make the request and capture the HTML response
+export async function fetchFinnly(rink: FinnlyRink): Promise<unknown> {
+  const url = scheduleUrl(rink);
+  const res = await fetch(url, { headers: { "user-agent": USER_AGENT } });
+
+  // check for success
+  if (!res.ok) {
+    throw new Error(`Finnly (${rink}) returned HTTP ${res.status}`);
+  }
+
+  const contentType = res.headers.get("content-type") ?? "";
+
+  // then check for structure
+  if (!contentType.includes("text/html")) { 
+    throw new Error(`Finnly (${rink}) returned ${contentType}, not HTML`);
+  }
+
+  // finally we have one chance to read the body from the response
+  const html = await res.text();
+  return stripFinnlyHtml(html);
+}
 
 export function stripFinnlyHtml(rawHTML: string): unknown {
   const startMarker = "_onlineScheduleList = ";
@@ -49,7 +71,6 @@ export function stripFinnlyHtml(rawHTML: string): unknown {
 
 export function parseFinnly(jsonData: unknown, rink: FinnlyRink): Session[] {
   const items = FinnlyResponse.parse(jsonData);
-  const scheduleId = FINNLY_RINKS[rink]; // TODO: is this right?
 
   return items.flatMap((item): Session[] => {
     const activity = ACTIVITIES[item.EventTypeName];
@@ -63,7 +84,7 @@ export function parseFinnly(jsonData: unknown, rink: FinnlyRink): Session[] {
         rawTitle: item.EventTypeName,
         startTime: item.EventStartTime,
         endTime: item.EventEndTime,
-        sourceUrl: `https://ssprd.finnlyconnect.com/schedule/${scheduleId}`,
+        sourceUrl: scheduleUrl(rink),
         surface: item.FacilityName,
         notes: item.Description,
       },

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { readFileSync } from "node:fs";
-import { stripFinnlyHtml, parseFinnly } from "./finnly";
+import { fetchFinnly, stripFinnlyHtml, parseFinnly } from "./finnly";
 import { Session } from "@ice-time/shared";
 
 const southSubFixture = readFileSync(
@@ -97,4 +97,47 @@ describe("Finnly Adapter, Family Sports (parse)", () => {
   });
 });
 
-// TODO: test fetching
+afterEach(() => {
+  vi.unstubAllGlobals(); // put the real fetch back after every test
+});
+
+function stubFetch(response: Response) {
+  const fake = vi.fn().mockResolvedValue(response);
+  vi.stubGlobal("fetch", fake);
+  return fake;
+}
+
+function htmlResponse(body: string, status = 200) {
+  return new Response(body, {
+    status,
+    headers: { "content-type": "text/html; charset=utf-8" },
+  });
+}
+
+describe("Finnly Adapter (fetch)", () => {
+  it("requests the rink's schedule page with our user agent", async () => {
+    const fake = stubFetch(htmlResponse('_onlineScheduleList = [{"EventId":1}];'));
+    await fetchFinnly("family-sports");
+
+    const [url, init] = fake.mock.calls[0]!;
+    expect(url).toBe("https://ssprd.finnlyconnect.com/schedule/246");
+    expect(init.headers["user-agent"]).toContain("ice-time-scraper");
+  });
+
+  it("returns the schedule data pulled out of the page", async () => {
+    stubFetch(htmlResponse('<script>_onlineScheduleList = [{"EventId":1}];</script>'));
+    await expect(fetchFinnly("south-sub")).resolves.toEqual([{ EventId: 1 }]);
+  });
+
+  it("throws on a non-2xx status (site down), even though the error page is HTML", async () => {
+    stubFetch(htmlResponse("<html>Service Unavailable</html>", 503));
+    await expect(fetchFinnly("south-sub")).rejects.toThrow("HTTP 503");
+  });
+
+  it("throws when the response isn't HTML", async () => {
+    stubFetch(
+      new Response("{}", { headers: { "content-type": "application/json" } }),
+    );
+    await expect(fetchFinnly("south-sub")).rejects.toThrow("not HTML");
+  });
+});
