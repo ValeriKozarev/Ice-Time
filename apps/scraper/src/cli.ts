@@ -14,14 +14,14 @@ const rinks: Record<Rink, RinkStatus> = {
   "family-sports": { status: "failed", error: "adapter not written yet" },
 };
 
-type Adapter = { rink: Rink; scrape: () => Promise<Session[]> };
-
 const today = new Intl.DateTimeFormat("en-CA", {
   timeZone: "America/Denver",
 }).format(new Date());
 const { start, end } = upcomingWeek(today);
 // const start = "2026-10-26"
 // const end = "2026-11-01"
+
+type Adapter = { rink: Rink; scrape: () => Promise<Session[]> };
 
 const adapters: Adapter[] = [
   // this one accepts a date range so we compute it programmatically
