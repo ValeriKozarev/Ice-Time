@@ -11,11 +11,11 @@ const ACTIVITIES: Record<string, Activity> = {
   "Take A Shot": "stick-and-puck",
 };
 
-// shorthand for computing the two versions of the URL since we do this more than once
-const scheduleUrl = (rink: FinnlyRink) => `https://ssprd.finnlyconnect.com/schedule/${FINNLY_RINKS[rink]}`;
-
 const FINNLY_RINKS = { "south-sub": 247, "family-sports": 246 } as const;
 export type FinnlyRink = keyof typeof FINNLY_RINKS;
+
+// shorthand for computing the two versions of the URL since we do this more than once
+const scheduleUrl = (rink: FinnlyRink) => `https://ssprd.finnlyconnect.com/schedule/${FINNLY_RINKS[rink]}`;
 
 // note: both South Sub and Family Sports rinks use the same Finnly platform, so we'll standardize once on what data we want to capture and use it in both places
 const FinnlyItem = z.object({
@@ -56,7 +56,7 @@ export function stripFinnlyHtml(rawHTML: string): unknown {
     throw new Error("Finnly page has no _onlineScheduleList (layout changed?)");
   }
 
-  const start = startMarkerAt + startMarker.length; // first char after "= ", i.e. the [ = rawHTML.indexOf(startMarker) + startMarker.length;
+  const start = startMarkerAt + startMarker.length; // first char after "= ", i.e. the [
 
   const endMarker = "];";
   const endMarkerAt = rawHTML.indexOf(endMarker, start);
